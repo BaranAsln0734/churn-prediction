@@ -10,14 +10,15 @@ The project utilizes the [Kaggle Telco Customer Churn Dataset](https://www.kaggl
 
 ## Approach
 The development pipeline is split into modular components:
-1. **Data Preprocessing & Feature Engineering**: Converting raw customer profiles, managing missing values in `TotalCharges`, encoding categorical features using `LabelEncoder`, and engineering new features:
+1. **Exploratory Data Analysis (EDA)**: Visually exploring demographic distributions, correlation matrices, and churn triggers using a Jupyter Notebook.
+2. **Data Preprocessing & Feature Engineering**: Converting raw customer profiles, managing missing values in `TotalCharges`, encoding categorical features using `LabelEncoder`, and engineering new features:
    - `NumServices`: Total active digital services (0-8)
    - `AvgMonthlySpend`: Average spending calculated from total charges and tenure
    - `IsNewCustomer`: A binary indicator flag for tenure <= 6 months
-2. **Handling Class Imbalance**: Applying Synthetic Minority Over-sampling Technique (SMOTE) to the training set to prevent bias towards the majority class (non-churners).
-3. **Model Evaluation & Selection**: Training and benchmarking Logistic Regression, Random Forest, and XGBoost classifiers.
-4. **Model Explainability**: Utilizing SHAP (SHapley Additive exPlanations) values to extract global feature importances and interpret individual customer decisions.
-5. **Deployment**: Delivering the solution via two channels:
+3. **Handling Class Imbalance**: Applying Synthetic Minority Over-sampling Technique (SMOTE) to the training set to prevent bias towards the majority class (non-churners).
+4. **Model Evaluation & Selection**: Training and benchmarking Logistic Regression, Random Forest, and XGBoost classifiers.
+5. **Model Explainability**: Utilizing SHAP (SHapley Additive exPlanations) values to extract global feature importances and interpret individual customer decisions.
+6. **Deployment**: Delivering the solution via two channels:
    - An interactive, styled **Streamlit web application** for business users.
    - A high-performance **FastAPI REST API** for automated model serving.
 
@@ -57,11 +58,12 @@ To bridge the gap between machine learning metrics and corporate finance, a busi
 
 ## Tech Stack
 * **Languages**: Python
-* **Data Processing**: Pandas, NumPy
+* **Data Processing**: Pandas, NumPy, Jupyter Notebook
 * **Modeling & Metrics**: Scikit-Learn, XGBoost, Imbalanced-Learn (SMOTE)
 * **Model Explanations**: SHAP
 * **Serialization**: Joblib
 * **Deployment & UI**: Streamlit, FastAPI, Uvicorn
+* **Testing & Containerization**: Pytest, Docker
 
 ## Project Structure
 ```text
@@ -76,20 +78,25 @@ churn-prediction/
 │   ├── comparison.csv       # Benchmark metrics CSV output
 │   ├── shap_feature_importance.png  # Average SHAP impact plot
 │   └── shap_summary.png     # Detailed SHAP beeswarm plot
+├── notebooks/
+│   └── churn_exploration.ipynb  # Jupyter Notebook containing exploratory data analysis (EDA)
 ├── src/
 │   ├── data_prep.py         # Data cleaning, feature engineering, and encoding
 │   ├── train.py             # SMOTE balancing and model training pipeline
 │   ├── explain.py           # SHAP visualization generation script
 │   └── business_impact.py   # Business value calculations script
+├── tests/
+│   └── test_api.py          # Pytest unit tests for the FastAPI service endpoints
 ├── app.py                   # Streamlit SaaS dashboard
 ├── api.py                   # FastAPI REST API serving endpoints
+├── Dockerfile               # Containerization configuration
 └── README.md                # Project documentation
 ```
 
 ## How to Run
 
 ### 1. Installation
-Clone the repository and install the dependencies listed in `requirements.txt`:
+Clone the repository and install the dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -118,25 +125,56 @@ Run the business simulation report on the test set:
 python src/business_impact.py
 ```
 
-### 6. Start the Web Dashboard
-Launch the interactive Streamlit dashboard:
+### 6. Running Unit Tests
+Validate the REST API endpoints and schema models using `pytest`:
 ```bash
-streamlit run app.py
+pytest tests/
 ```
 
-### 7. Run the REST API
-Deploy the FastAPI prediction service using Uvicorn:
+### 7. Run via Docker
+Build and run the containerized FastAPI prediction service:
 ```bash
-python api.py
-```
-You can access the API docs locally at `http://127.0.0.1:8000/docs`.
+# Build the Docker image
+docker build -t churn-prediction-api .
 
-## Live Demo
-Below is a preview of the interactive Streamlit SaaS dashboard:
+# Run the FastAPI server inside the container
+docker run -p 8000:8000 churn-prediction-api
+```
+
+To run the Streamlit dashboard instead, override the container's starting command:
+```bash
+docker run -p 8501:8501 churn-prediction-api streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+```
+
+### 8. Start Services Locally
+* **Web Dashboard**: Launch the interactive Streamlit dashboard:
+  ```bash
+  streamlit run app.py
+  ```
+* **REST API**: Deploy the FastAPI prediction service locally:
+  ```bash
+  python api.py
+  ```
+  Access the interactive API docs at `http://127.0.0.1:8000/docs`.
+
+## Live Demo & Deployment Guide
+You can deploy the interactive Streamlit dashboard to **Hugging Face Spaces** or **Streamlit Community Cloud** for free.
+
+### Deploying to Hugging Face Spaces:
+1. Create a free account at [Hugging Face](https://huggingface.co/).
+2. Click **New Space** and configure:
+   - **SDK**: Select `Streamlit`.
+   - **Visibility**: Set to `Public` (or `Private`).
+3. Commit and push the following files to your space repository:
+   - `app.py`
+   - `requirements.txt`
+   - `models/best_model.pkl`
+   - `models/encoders.pkl`
+   - `models/feature_names.pkl`
+4. The space will automatically install dependencies and run your Streamlit SaaS dashboard in a live environment!
 
 ![Demo Screenshot](screenshot.png)
 
 ## Future Improvements
 * **Hyperparameter Tuning**: Implement automated search (GridSearchCV or Optuna) to optimize Random Forest and XGBoost hyperparameters.
-* **Containerization**: Package the FastAPI and Streamlit apps into Docker containers for simplified cloud deployment.
 * **CI/CD Integration**: Add automated testing and formatting workflows using GitHub Actions.
