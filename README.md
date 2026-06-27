@@ -2,6 +2,8 @@
 
 An end-to-end machine learning pipeline and interactive dashboard designed to predict customer churn, analyze risk factors using SHAP, and estimate the financial business impact of retention campaigns.
 
+👉 **[Access the Live SaaS Dashboard](https://churn-prediction-k2rt7woncejrdwapmz8qmp.streamlit.app/)**
+
 ## Problem Statement
 In the highly competitive telecommunications industry, retaining existing customers is far more cost-effective than acquiring new ones. Customer churn directly impacts monthly recurring revenue (MRR) and long-term business sustainability. The goal of this project is to build a predictive system that identifies customers at risk of leaving, provides explanations for individual churn risks, and translates these model predictions into quantifiable financial value for business stakeholders.
 
@@ -157,10 +159,14 @@ docker run -p 8501:8501 churn-prediction-api streamlit run app.py --server.port=
   ```
   Access the interactive API docs at `http://127.0.0.1:8000/docs`.
 
-## Live Demo & Deployment Guide
-You can deploy the interactive Streamlit dashboard to **Hugging Face Spaces** or **Streamlit Community Cloud** for free.
+## Live Demo & Deployment
+Experience the interactive SaaS dashboard live:
+👉 **[Access the Live Dashboard on Streamlit Cloud](https://churn-prediction-k2rt7woncejrdwapmz8qmp.streamlit.app/)**
 
-### Deploying to Hugging Face Spaces:
+### Local or Self-Hosted Deployment Guide:
+You can also deploy the interactive Streamlit dashboard to **Hugging Face Spaces** or **Streamlit Community Cloud** for free.
+
+#### Deploying to Hugging Face Spaces:
 1. Create a free account at [Hugging Face](https://huggingface.co/).
 2. Click **New Space** and configure:
    - **SDK**: Select `Streamlit`.
