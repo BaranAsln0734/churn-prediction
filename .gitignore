@@ -1,0 +1,33 @@
+# Python byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / unit tests cache
+.pytest_cache/
+.pytest/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE configurations
+.vscode/
+.idea/
+
+# Temporary / Scratch scripts
+scratch/
+
+# Data & Models (ignore large datasets and binary models, keep gitkeeps for directory structure)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+models/*
+!models/.gitkeep
