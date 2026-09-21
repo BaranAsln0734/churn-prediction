@@ -380,12 +380,62 @@ def get_risk_factors(inputs_raw):
     
     return factors[:3]
 
+# Helper to batch process and predict dataframe
+def process_batch_df(df_input_raw, encoders, feature_names, model):
+    df = df_input_raw.copy()
+    if 'TotalCharges' in df.columns:
+        df['TotalCharges'] = pd.to_numeric(df['TotalCharges'].astype(str).str.strip().replace('', np.nan), errors='coerce').fillna(0.0)
+    
+    if 'NumServices' not in df.columns:
+        service_cols = [c for c in ['PhoneService', 'MultipleLines', 'OnlineSecurity', 'OnlineBackup', 
+                                    'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies'] if c in df.columns]
+        if service_cols:
+            df['NumServices'] = df[service_cols].apply(lambda row: sum(str(x).lower() == 'yes' for x in row), axis=1)
+        else:
+            df['NumServices'] = 0
+            
+    if 'AvgMonthlySpend' not in df.columns and 'tenure' in df.columns and 'MonthlyCharges' in df.columns and 'TotalCharges' in df.columns:
+        df['AvgMonthlySpend'] = np.where(df['tenure'] == 0, df['MonthlyCharges'], df['TotalCharges'] / df['tenure'].replace(0, 1))
+        
+    if 'IsNewCustomer' not in df.columns and 'tenure' in df.columns:
+        df['IsNewCustomer'] = (df['tenure'] <= 6).astype(int)
+        
+    for col, enc in encoders.items():
+        if col in df.columns and (df[col].dtype == 'object' or (len(df) > 0 and isinstance(df[col].iloc[0], str))):
+            known_classes = set(enc.classes_)
+            df[col] = df[col].astype(str).map(lambda x: enc.transform([x])[0] if x in known_classes else 0)
+            
+    # Ensure all model feature columns exist
+    for mc in feature_names:
+        if mc not in df.columns:
+            df[mc] = 0
+        
+    X = df[feature_names]
+    probas = model.predict_proba(X)[:, 1]
+    
+    res = df_input_raw.copy()
+    res['Churn_Probability'] = np.round(probas, 4)
+    res['Risk_Level'] = np.where(probas >= 0.60, 'High', np.where(probas >= 0.30, 'Medium', 'Low'))
+    
+    def get_rec(level):
+        if level == 'High':
+            return "Urgent outreach required: offer promotional contract renewal or loyalty discount."
+        elif level == 'Medium':
+            return "Medium risk: schedule customer satisfaction check-in and feature discovery."
+        return "Low risk: healthy account. Maintain standard quality and explore upselling."
+        
+    res['Retention_Recommendation'] = [get_rec(lvl) for lvl in res['Risk_Level']]
+    return res
+
 # Create interface layout
 if resources_ready:
     render_header()
     
-    # Divide the main dashboard area into two columns: 35% form inputs, 65% results
-    left_col, right_col = st.columns([35, 65])
+    tab_single, tab_batch = st.tabs(["👤 Single Customer Evaluation", "📁 Batch CSV Analysis"])
+    
+    with tab_single:
+        # Divide the main dashboard area into two columns: 35% form inputs, 65% results
+        left_col, right_col = st.columns([35, 65])
     
     # 2. LEFT COLUMN (Form inputs grouped logically)
     with left_col:
@@ -609,6 +659,125 @@ if resources_ready:
                 ]
             })
             st.table(summary_df)
+
+    with tab_batch:
+        st.markdown("### 📁 Batch Customer Churn Evaluation")
+        st.markdown(
+            "<p style='color:#94A3B8; font-size:14px; margin-top:-6px;'>"
+            "Upload a customer dataset to evaluate churn probabilities, segment risk categories, and export actionable retention campaigns."
+            "</p>",
+            unsafe_allow_html=True
+        )
+        
+        b_col1, b_col2 = st.columns([70, 30])
+        with b_col1:
+            uploaded_batch_file = st.file_uploader("Upload Customer CSV File", type=["csv"], key="batch_csv_file")
+        with b_col2:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            load_sample_clicked = st.button("📂 Load Sample Test Data (50 Customers)", use_container_width=True)
+            
+        df_batch_to_process = None
+        if uploaded_batch_file is not None:
+            try:
+                df_batch_to_process = pd.read_csv(uploaded_batch_file)
+            except Exception as ex:
+                st.error(f"Error reading CSV: {ex}")
+        elif load_sample_clicked:
+            sample_data_path = os.path.join(BASE_DIR, 'data', 'processed', 'test.csv')
+            if not os.path.exists(sample_data_path):
+                sample_data_path = os.path.join(BASE_DIR, 'data', 'processed', 'X_test.csv')
+            if os.path.exists(sample_data_path):
+                df_batch_to_process = pd.read_csv(sample_data_path).head(50)
+                st.session_state['sample_batch_df'] = df_batch_to_process
+            else:
+                st.warning("Sample test data file not found.")
+        elif 'sample_batch_df' in st.session_state and uploaded_batch_file is None:
+            df_batch_to_process = st.session_state['sample_batch_df']
+            
+        if df_batch_to_process is not None:
+            with st.spinner("Processing customer profiles and calculating risk scores..."):
+                scored_df = process_batch_df(df_batch_to_process, encoders, feature_names, model)
+                
+            total_n = len(scored_df)
+            high_mask = scored_df['Risk_Level'] == 'High'
+            med_mask = scored_df['Risk_Level'] == 'Medium'
+            low_mask = scored_df['Risk_Level'] == 'Low'
+            
+            high_count = int(high_mask.sum())
+            med_count = int(med_mask.sum())
+            low_count = int(low_mask.sum())
+            
+            # Revenue at risk
+            monthly_col = 'MonthlyCharges' if 'MonthlyCharges' in scored_df.columns else None
+            if monthly_col:
+                revenue_at_risk = float(scored_df.loc[high_mask, monthly_col].sum())
+            else:
+                revenue_at_risk = high_count * 64.76
+                
+            # Metric cards
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.markdown(f"""
+                <div class="custom-card" style="text-align: center;">
+                    <div style="color: #94A3B8; font-size: 13px; font-weight: 500;">TOTAL EVALUATED</div>
+                    <div style="color: #E2E8F0; font-size: 32px; font-weight: 700; margin-top: 4px;">{total_n}</div>
+                    <div style="color: #3DD9C4; font-size: 12px; margin-top: 4px;">👥 Customer Records</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with m2:
+                st.markdown(f"""
+                <div class="custom-card" style="text-align: center; border-left: 4px solid #F87171;">
+                    <div style="color: #94A3B8; font-size: 13px; font-weight: 500;">HIGH CHURN RISK</div>
+                    <div style="color: #F87171; font-size: 32px; font-weight: 700; margin-top: 4px;">{high_count} <span style="font-size: 16px; font-weight: 500;">({(high_count/total_n)*100:.1f}%)</span></div>
+                    <div style="color: #F87171; font-size: 12px; margin-top: 4px;">🚨 Immediate Retention</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with m3:
+                st.markdown(f"""
+                <div class="custom-card" style="text-align: center; border-left: 4px solid #FBBF24;">
+                    <div style="color: #94A3B8; font-size: 13px; font-weight: 500;">MEDIUM RISK</div>
+                    <div style="color: #FBBF24; font-size: 32px; font-weight: 700; margin-top: 4px;">{med_count} <span style="font-size: 16px; font-weight: 500;">({(med_count/total_n)*100:.1f}%)</span></div>
+                    <div style="color: #FBBF24; font-size: 12px; margin-top: 4px;">⚠️ Engagement Outreach</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with m4:
+                st.markdown(f"""
+                <div class="custom-card" style="text-align: center; border-left: 4px solid #3DD9C4;">
+                    <div style="color: #94A3B8; font-size: 13px; font-weight: 500;">MONTHLY REVENUE AT RISK</div>
+                    <div style="color: #3DD9C4; font-size: 32px; font-weight: 700; margin-top: 4px;">${revenue_at_risk:,.0f}</div>
+                    <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">MRR Vulnerability</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Sort so high risk is at top
+            display_df = scored_df.sort_values(by='Churn_Probability', ascending=False)
+            
+            st.markdown("#### 📊 Scored Customer Records")
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                height=350
+            )
+            
+            # Download Button
+            csv_export = display_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Scored Customer List (CSV)",
+                data=csv_export,
+                file_name="churn_predictions_scored.csv",
+                mime="text/csv",
+                type="primary"
+            )
+        else:
+            st.markdown("""
+            <div style='border: 2px dashed #1E293B; border-radius: 12px; padding: 60px 40px; text-align: center; background-color: #0F1729; margin-top: 20px;'>
+                <div style='font-size: 48px; margin-bottom: 16px; color: #94A3B8;'>📁</div>
+                <h3 style='color: #E2E8F0; margin-bottom: 8px; font-family: "Space Grotesk", sans-serif;'>No Dataset Loaded</h3>
+                <p style='color: #94A3B8; max-width: 440px; margin: 0 auto; font-size: 14px;'>
+                    Upload a CSV file with customer attributes, or click <b>Load Sample Test Data</b> above to preview batch scoring on 50 customer profiles instantly.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # Footer Area
 st.markdown("---")

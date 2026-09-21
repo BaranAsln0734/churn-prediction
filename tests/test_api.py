@@ -47,18 +47,66 @@ def test_predict_churn_valid_low_risk(client):
     }
     
     response = client.post("/predict", json=payload)
-    # If the model files are not trained yet, startup might fail or model is None, 
-    # but we assume resources are loaded during testing.
-    # In case the model file isn't present in testing environment:
-    if response.status_code == 503:
-        pytest.skip("Model files are not generated yet, skipping prediction test.")
-        
     assert response.status_code == 200
     json_data = response.json()
     assert "churn_probability" in json_data
     assert "risk_level" in json_data
     assert "recommendation" in json_data
     assert json_data["risk_level"] in ["Low", "Medium", "High"]
+
+def test_predict_batch_valid(client):
+    """Test POST /predict/batch with a list of customer profiles."""
+    payload = [
+        {
+            "gender": "Male",
+            "SeniorCitizen": 0,
+            "Partner": "Yes",
+            "Dependents": "Yes",
+            "tenure": 60,
+            "PhoneService": "Yes",
+            "MultipleLines": "Yes",
+            "InternetService": "DSL",
+            "OnlineSecurity": "Yes",
+            "OnlineBackup": "Yes",
+            "DeviceProtection": "Yes",
+            "TechSupport": "Yes",
+            "StreamingTV": "No",
+            "StreamingMovies": "No",
+            "Contract": "Two year",
+            "PaperlessBilling": "No",
+            "PaymentMethod": "Credit card (automatic)",
+            "MonthlyCharges": 45.0,
+            "TotalCharges": 2700.0
+        },
+        {
+            "gender": "Female",
+            "SeniorCitizen": 1,
+            "Partner": "No",
+            "Dependents": "No",
+            "tenure": 2,
+            "PhoneService": "Yes",
+            "MultipleLines": "No",
+            "InternetService": "Fiber optic",
+            "OnlineSecurity": "No",
+            "OnlineBackup": "No",
+            "DeviceProtection": "No",
+            "TechSupport": "No",
+            "StreamingTV": "Yes",
+            "StreamingMovies": "Yes",
+            "Contract": "Month-to-month",
+            "PaperlessBilling": "Yes",
+            "PaymentMethod": "Electronic check",
+            "MonthlyCharges": 95.0,
+            "TotalCharges": 190.0
+        }
+    ]
+    
+    response = client.post("/predict/batch", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_customers"] == 2
+    assert len(data["predictions"]) == 2
+    assert data["high_risk_count"] + data["medium_risk_count"] + data["low_risk_count"] == 2
 
 def test_predict_churn_invalid_category(client):
     """Test POST /predict with an invalid category value, verifying 400 Bad Request."""
@@ -85,9 +133,6 @@ def test_predict_churn_invalid_category(client):
     }
     
     response = client.post("/predict", json=payload)
-    if response.status_code == 503:
-        pytest.skip("Model files are not generated yet, skipping prediction test.")
-        
     assert response.status_code == 400
     assert "Invalid value" in response.json()["detail"]
 
@@ -96,7 +141,6 @@ def test_predict_churn_missing_fields(client):
     payload = {
         "gender": "Male",
         "tenure": 12
-        # Missing other fields
     }
     
     response = client.post("/predict", json=payload)

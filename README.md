@@ -1,5 +1,10 @@
 # Telco Customer Churn Prediction & Retention Dashboard
 
+[![FastAPI](https://img.shields.io/badge/FastAPI-1.1.0-009688?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B?logo=streamlit)](https://streamlit.io)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?logo=python)](https://python.org)
+[![Tests](https://img.shields.io/badge/Tests-8%20Passed-success)](https://pytest.org)
+
 An end-to-end machine learning pipeline and interactive dashboard designed to predict customer churn, analyze risk factors using SHAP, and estimate the financial business impact of retention campaigns.
 
 👉 **[Access the Live SaaS Dashboard](https://churn-prediction-k2rt7woncejrdwapmz8qmp.streamlit.app/)**
@@ -83,14 +88,18 @@ churn-prediction/
 ├── notebooks/
 │   └── churn_exploration.ipynb  # Jupyter Notebook containing exploratory data analysis (EDA)
 ├── src/
+│   ├── preprocessing.py     # Unified data cleaning, feature engineering, and encoding
 │   ├── data_prep.py         # Data cleaning, feature engineering, and encoding
 │   ├── train.py             # SMOTE balancing and model training pipeline
 │   ├── explain.py           # SHAP visualization generation script
 │   └── business_impact.py   # Business value calculations script
 ├── tests/
-│   └── test_api.py          # Pytest unit tests for the FastAPI service endpoints
-├── app.py                   # Streamlit SaaS dashboard
-├── api.py                   # FastAPI REST API serving endpoints
+│   ├── test_api.py          # Pytest unit tests for single and batch REST API endpoints
+│   └── test_pipeline.py     # Pytest unit tests for data preprocessing pipeline
+├── ci/
+│   └── github-actions-ci.yml # Automated CI/CD pipeline template
+├── app.py                   # Streamlit SaaS dashboard (Single & Batch Analysis)
+├── api.py                   # FastAPI REST API serving endpoints (/predict & /predict/batch)
 ├── Dockerfile               # Containerization configuration
 └── README.md                # Project documentation
 ```
